@@ -13,18 +13,18 @@ workflows:
           echo "==> npm ci"
           npm ci
 
-      - name: Sync Capacitor (create ios project files)
+      - name: Sync capacitor
         script: |
           echo "==> npx cap sync ios"
           npx cap sync ios || true
 
-      - name: Debug: list ios files
+      - name: Debug list ios files
         script: |
           echo "==> DEBUG: pwd"
           pwd
           echo "==> DEBUG: ls -la repo root"
           ls -la
-          echo "==> DEBUG: show ios folder (top-level, two levels)"
+          echo "==> DEBUG: show ios folder"
           if [ -d ios ]; then
             echo "---- listing ios"
             ls -la ios || true
@@ -33,12 +33,11 @@ workflows:
           else
             echo "No ios directory found at repo root"
           fi
-          echo "==> DEBUG: find . for xcode files (maxdepth 4)"
-          find . -maxdepth 4 -type f -name "*.xcworkspace" -o -name "*.xcodeproj" -print || true
+          echo "==> DEBUG: find xcworkspace/xcodeproj"
+          find . -maxdepth 4 -type f \( -name "*.xcworkspace" -o -name "*.xcodeproj" \) -print || true
 
-      - name: Ensure CocoaPods workspace (run pod install)
+      - name: Ensure cocoapods
         script: |
-          # try common Podfile locations
           POD_DIR=""
           if [ -f ios/App/Podfile ]; then
             POD_DIR="ios/App"
@@ -53,56 +52,45 @@ workflows:
               pod repo update --silent || true
               pod install --verbose || true
             else
-              echo "pod command not found in PATH"
+              echo "pod command not available"
             fi
             cd "$CI_PROJECT_DIR" || true
           else
             echo "No Podfile found in ios/App or ios — skipping pod install"
           fi
 
-      - name: Build iOS archive (auto-detect workspace or project, NO SIGNING)
+      - name: Build iOS archive (auto-detect, no signing)
         script: |
           set -e
           echo "==> locating xcworkspace or xcodeproj"
-          WKS=$(find ios -type d -name "*.xcworkspace" -print | head -n 1 || true)
-          PRJ=$(find ios -type d -name "*.xcodeproj" -print | head -n 1 || true)
+          # find files (first match)
+          WKS_FILE=$(find ios -type f -name "*.xcworkspace" -print | head -n 1 || true)
+          PRJ_FILE=$(find ios -type f -name "*.xcodeproj" -print | head -n 1 || true)
 
-          # if find returns directories, xcode expects the file path (workspace is a directory + file)
-          if [ -z "$WKS" ] && [ -n "$PRJ" ]; then
-            echo "No workspace found; project found: $PRJ"
-          elif [ -n "$WKS" ]; then
-            echo "Workspace found: $WKS"
+          if [ -n "$WKS_FILE" ]; then
+            echo "Workspace found: $WKS_FILE"
+            xcodebuild \
+              -workspace "$WKS_FILE" \
+              -scheme App \
+              -sdk iphoneos \
+              -configuration Release \
+              -archivePath build/App.xcarchive \
+              CODE_SIGNING_ALLOWED=NO \
+              archive
+          elif [ -n "$PRJ_FILE" ]; then
+            echo "Project found: $PRJ_FILE"
+            xcodebuild \
+              -project "$PRJ_FILE" \
+              -scheme App \
+              -sdk iphoneos \
+              -configuration Release \
+              -archivePath build/App.xcarchive \
+              CODE_SIGNING_ALLOWED=NO \
+              archive
           else
-            echo "Neither .xcworkspace nor .xcodeproj found in ios directory after sync/pod. Showing tree:"
+            echo "ERROR: No .xcworkspace or .xcodeproj found under ios/ — listing ios folder for debugging"
             ls -la ios || true
-            echo "Failing so you can inspect logs."
             exit 1
-          fi
-
-          # choose workspace if found, else project
-          if [ -n "$WKS" ]; then
-            WORKSPACE_PATH="$WKS"
-            echo "Using workspace path: $WORKSPACE_PATH"
-            xcodebuild \
-              -workspace "$WORKSPACE_PATH" \
-              -scheme App \
-              -sdk iphoneos \
-              -configuration Release \
-              -archivePath build/App.xcarchive \
-              CODE_SIGNING_ALLOWED=NO \
-              archive
-          else
-            # use project build
-            PROJECT_PATH="$PRJ"
-            echo "Using project path: $PROJECT_PATH"
-            xcodebuild \
-              -project "$PROJECT_PATH" \
-              -scheme App \
-              -sdk iphoneos \
-              -configuration Release \
-              -archivePath build/App.xcarchive \
-              CODE_SIGNING_ALLOWED=NO \
-              archive
           fi
 
     artifacts:
