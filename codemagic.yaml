@@ -1,0 +1,36 @@
+workflows:
+  ios-capacitor:
+    name: iOS Capacitor Build
+    max_build_duration: 60
+    environment:
+      node: latest
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm ci
+
+      - name: Sync Capacitor
+        script: |
+          npx cap sync ios
+
+      - name: Build iOS archive
+        script: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath build/App.xcarchive \
+            archive
+
+      - name: Export IPA
+        script: |
+          xcodebuild -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportOptionsPlist ios/exportOptions.plist \
+            -exportPath build/ipa
+
+    artifacts:
+      - build/ipa/*.ipa
