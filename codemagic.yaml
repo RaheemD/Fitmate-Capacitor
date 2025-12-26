@@ -10,16 +10,39 @@ workflows:
     scripts:
       - name: Install dependencies
         script: |
-          npm install
+          npm ci
 
-      - name: Sync Capacitor
+      - name: Sync Capacitor (create ios project files)
         script: |
           npx cap sync ios
 
+      - name: Ensure CocoaPods workspace (run pod install)
+        script: |
+          # try the common locations for the Podfile / Xcode project
+          if [ -f ios/App/Podfile ]; then
+            cd ios/App
+          elif [ -f ios/Podfile ]; then
+            cd ios
+          else
+            echo "No Podfile found in ios/App or ios — continuing, but workspace may not be created."
+          fi
+          if command -v pod >/dev/null 2>&1; then
+            pod install || true
+          else
+            echo "pod not found"
+          fi
+          cd "$CI_PROJECT_DIR" || true
+
       - name: Build iOS archive (NO SIGNING)
         script: |
+          # adjust path if your workspace lives elsewhere
+          XWKS="ios/App/App.xcworkspace"
+          if [ ! -d "$XWKS" ] && [ -d "ios/App.xcworkspace" ]; then
+            XWKS="ios/App.xcworkspace"
+          fi
+          echo "Using workspace: $XWKS"
           xcodebuild \
-            -workspace ios/App/App.xcworkspace \
+            -workspace "$XWKS" \
             -scheme App \
             -sdk iphoneos \
             -configuration Release \
