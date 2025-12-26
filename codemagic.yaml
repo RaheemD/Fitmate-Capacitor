@@ -1,6 +1,6 @@
 workflows:
   ios-capacitor:
-    name: iOS Capacitor Build (debug)
+    name: iOS Capacitor Build
     max_build_duration: 60
     environment:
       node: latest
@@ -10,88 +10,37 @@ workflows:
     scripts:
       - name: Install dependencies
         script: |
-          echo "==> npm ci"
           npm ci
 
-      - name: Sync capacitor
+      - name: Add iOS platform if missing
         script: |
-          echo "==> npx cap sync ios"
-          npx cap sync ios || true
-
-      - name: Debug list ios files
-        script: |
-          echo "==> DEBUG: pwd"
-          pwd
-          echo "==> DEBUG: ls -la repo root"
-          ls -la
-          echo "==> DEBUG: show ios folder"
-          if [ -d ios ]; then
-            echo "---- listing ios"
-            ls -la ios || true
-            echo "---- listing ios/App"
-            ls -la ios/App || true
+          if [ ! -d ios/App ]; then
+            echo "iOS platform missing – adding"
+            npx cap add ios
           else
-            echo "No ios directory found at repo root"
+            echo "iOS platform exists"
           fi
-          echo "==> DEBUG: find xcworkspace/xcodeproj"
-          find . -maxdepth 4 -type f \( -name "*.xcworkspace" -o -name "*.xcodeproj" \) -print || true
 
-      - name: Ensure cocoapods
+      - name: Sync Capacitor
         script: |
-          POD_DIR=""
-          if [ -f ios/App/Podfile ]; then
-            POD_DIR="ios/App"
-          elif [ -f ios/Podfile ]; then
-            POD_DIR="ios"
-          fi
+          npx cap sync ios
 
-          if [ -n "$POD_DIR" ]; then
-            echo "Found Podfile in $POD_DIR — running pod install"
-            cd "$POD_DIR"
-            if command -v pod >/dev/null 2>&1; then
-              pod repo update --silent || true
-              pod install --verbose || true
-            else
-              echo "pod command not available"
-            fi
-            cd "$CI_PROJECT_DIR" || true
-          else
-            echo "No Podfile found in ios/App or ios — skipping pod install"
-          fi
-
-      - name: Build iOS archive (auto-detect, no signing)
+      - name: Install CocoaPods
         script: |
-          set -e
-          echo "==> locating xcworkspace or xcodeproj"
-          # find files (first match)
-          WKS_FILE=$(find ios -type f -name "*.xcworkspace" -print | head -n 1 || true)
-          PRJ_FILE=$(find ios -type f -name "*.xcodeproj" -print | head -n 1 || true)
+          cd ios/App
+          pod install
+          cd ../..
 
-          if [ -n "$WKS_FILE" ]; then
-            echo "Workspace found: $WKS_FILE"
-            xcodebuild \
-              -workspace "$WKS_FILE" \
-              -scheme App \
-              -sdk iphoneos \
-              -configuration Release \
-              -archivePath build/App.xcarchive \
-              CODE_SIGNING_ALLOWED=NO \
-              archive
-          elif [ -n "$PRJ_FILE" ]; then
-            echo "Project found: $PRJ_FILE"
-            xcodebuild \
-              -project "$PRJ_FILE" \
-              -scheme App \
-              -sdk iphoneos \
-              -configuration Release \
-              -archivePath build/App.xcarchive \
-              CODE_SIGNING_ALLOWED=NO \
-              archive
-          else
-            echo "ERROR: No .xcworkspace or .xcodeproj found under ios/ — listing ios folder for debugging"
-            ls -la ios || true
-            exit 1
-          fi
+      - name: Build iOS archive (no signing)
+        script: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -sdk iphoneos \
+            -configuration Release \
+            -archivePath build/App.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            archive
 
     artifacts:
       - build/App.xcarchive
