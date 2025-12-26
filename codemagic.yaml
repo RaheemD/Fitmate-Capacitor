@@ -10,28 +10,22 @@ workflows:
     scripts:
       - name: Install dependencies
         script: |
-          npm ci
+          npm install
 
       - name: Sync Capacitor
         script: |
           npx cap sync ios
 
-      - name: Build iOS archive
+      - name: Build iOS archive (NO SIGNING)
         script: |
           xcodebuild \
-            -project ios/App.xcodeproj \
+            -workspace ios/App/App.xcworkspace \
             -scheme App \
             -sdk iphoneos \
             -configuration Release \
             -archivePath build/App.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
             archive
 
-      - name: Export IPA
-        script: |
-          xcodebuild -exportArchive \
-            -archivePath build/App.xcarchive \
-            -exportOptionsPlist ios/exportOptions.plist \
-            -exportPath build/ipa
-
     artifacts:
-      - build/ipa/*.ipa
+      - build/App.xcarchive
