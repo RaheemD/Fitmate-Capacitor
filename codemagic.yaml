@@ -6,6 +6,7 @@ workflows:
       node: latest
       xcode: latest
       cocoapods: default
+
     scripts:
       - name: Install dependencies
         script: |
@@ -18,7 +19,7 @@ workflows:
       - name: Build iOS archive
         script: |
           xcodebuild \
-            -workspace ios/App/App.xcworkspace \
+            -project ios/App.xcodeproj \
             -scheme App \
             -sdk iphoneos \
             -configuration Release \
