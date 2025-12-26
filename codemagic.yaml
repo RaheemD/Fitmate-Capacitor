@@ -1,40 +1,25 @@
 workflows:
   ios-capacitor:
-    name: iOS Capacitor Build
+    name: iOS Capacitor Build (No Signing)
     max_build_duration: 60
+
     environment:
       node: latest
       xcode: latest
-      cocoapods: default
 
     scripts:
       - name: Install dependencies
         script: |
           npm ci
 
-      - name: Add iOS platform if missing
-        script: |
-          if [ ! -d ios/App ]; then
-            echo "iOS platform missing – adding"
-            npx cap add ios
-          else
-            echo "iOS platform exists"
-          fi
-
-      - name: Sync Capacitor
+      - name: Sync Capacitor (create iOS project)
         script: |
           npx cap sync ios
 
-      - name: Install CocoaPods
-        script: |
-          cd ios/App
-          pod install
-          cd ../..
-
-      - name: Build iOS archive (no signing)
+      - name: Build iOS archive (xcodeproj, NO SIGNING)
         script: |
           xcodebuild \
-            -workspace ios/App/App.xcworkspace \
+            -project ios/App/App.xcodeproj \
             -scheme App \
             -sdk iphoneos \
             -configuration Release \
